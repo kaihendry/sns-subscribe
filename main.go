@@ -70,7 +70,11 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Infof("Email address: %s", r.PostForm["email"][0])
+	subscriberEmail := r.PostForm["email"][0]
+	ctx := log.WithFields(
+		log.Fields{
+			"email": subscriberEmail,
+		})
 
 	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
 	if err != nil {
@@ -79,16 +83,15 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg.Region = endpoints.ApEast1RegionID
-
 	svc := sns.New(cfg)
 	req := svc.SubscribeRequest(&sns.SubscribeInput{
-		Endpoint: aws.String(r.PostForm["email"][0]),
+		Endpoint: aws.String(subscriberEmail),
 		Protocol: aws.String("email"),
 		TopicArn: aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
 	})
 	_, err = req.Send(context.TODO())
 	if err != nil {
-		log.WithError(err).Error("unable to subscribe")
+		ctx.WithError(err).Error("unable to subscribe")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -99,4 +102,5 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		"Stage":          os.Getenv("UP_STAGE"),
 		"Year":           time.Now().Format("2006"),
 	})
+	ctx.Info("subscribed")
 }
