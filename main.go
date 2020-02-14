@@ -96,10 +96,9 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	svc := sns.New(sess)
 
 	_, err = svc.Subscribe(&sns.SubscribeInput{
-		Endpoint:              aws.String(subscriberEmail),
-		Protocol:              aws.String("email"),
-		ReturnSubscriptionArn: aws.Bool(true), // Return the ARN, even if user has yet to confirm
-		TopicArn:              aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
+		Endpoint: aws.String(subscriberEmail),
+		Protocol: aws.String("email"),
+		TopicArn: aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
 	})
 
 	t := template.Must(template.New("").ParseGlob("templates/*.html"))
