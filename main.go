@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"html/template"
 	"net/http"
 	"os"
@@ -10,10 +9,12 @@ import (
 	"github.com/apex/log"
 	jsonhandler "github.com/apex/log/handlers/json"
 	"github.com/apex/log/handlers/text"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/endpoints"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
 )
@@ -76,25 +77,30 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 			"email": subscriberEmail,
 		})
 
-	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
-	if err != nil {
-		log.WithError(err).Error("loading config")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	sess := session.New()
+	creds := credentials.NewChainCredentials(
+		[]credentials.Provider{
+			&credentials.EnvProvider{},
+			&credentials.SharedCredentialsProvider{Filename: "", Profile: "mine"},
+			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(sess)},
+		})
+
+	cfg := &aws.Config{
+		Region:                        aws.String("ap-southeast-1"),
+		Credentials:                   creds,
+		CredentialsChainVerboseErrors: aws.Bool(true),
 	}
-	cfg.Region = endpoints.ApEast1RegionID
-	svc := sns.New(cfg)
-	req := svc.SubscribeRequest(&sns.SubscribeInput{
-		Endpoint: aws.String(subscriberEmail),
-		Protocol: aws.String("email"),
-		TopicArn: aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
+
+	sess, err = session.NewSession(cfg)
+
+	svc := sns.New(sess)
+
+	_, err = svc.Subscribe(&sns.SubscribeInput{
+		Endpoint:              aws.String(subscriberEmail),
+		Protocol:              aws.String("email"),
+		ReturnSubscriptionArn: aws.Bool(true), // Return the ARN, even if user has yet to confirm
+		TopicArn:              aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
 	})
-	_, err = req.Send(context.TODO())
-	if err != nil {
-		ctx.WithError(err).Error("unable to subscribe")
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	t := template.Must(template.New("").ParseGlob("templates/*.html"))
 	t.ExecuteTemplate(w, "thankyou.html", map[string]interface{}{
