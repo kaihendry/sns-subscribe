@@ -1,0 +1,21 @@
+{
+  "name": "dabase-subscribe",
+  "profile": "mine",
+  "regions": [
+    "ap-southeast-1"
+  ],
+  "stages": {
+    "production": {
+      "domain": "subscribe.dabase.com"
+    },
+    "staging": {
+      "domain": "staging-subscribe.dabase.com"
+    }
+  },
+  "error_pages": {
+    "variables": {
+      "support_email": "hendry+dabase@iki.fi",
+      "color": "#e08b8b"
+    }
+  }
+}
