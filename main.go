@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/apex/log"
 	jsonhandler "github.com/apex/log/handlers/json"
@@ -19,6 +18,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var views = template.Must(template.New("").ParseGlob("templates/*.html"))
+
 func main() {
 	if os.Getenv("UP_STAGE") == "" {
 		log.SetHandler(text.Default)
@@ -30,7 +31,6 @@ func main() {
 	app.HandleFunc("/subscribe", handlePost).Methods("POST")
 	app.HandleFunc("/", handleIndex).Methods("GET")
 	var options []csrf.Option
-	// If developing locally
 	if os.Getenv("UP_STAGE") == "" {
 		// https://godoc.org/github.com/gorilla/csrf#Secure
 		log.Warn("CSRF insecure")
@@ -43,40 +43,31 @@ func main() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-
 	if os.Getenv("UP_STAGE") != "production" {
 		w.Header().Set("X-Robots-Tag", "none")
 	}
-
-	t := template.Must(template.New("").ParseGlob("templates/*.html"))
-	t.ExecuteTemplate(w, "index.html", map[string]interface{}{
+	views.ExecuteTemplate(w, "index.html", map[string]interface{}{
 		csrf.TemplateTag: csrf.TemplateField(r),
-		"Stage":          os.Getenv("UP_STAGE"),
-		"Year":           time.Now().Format("2006"),
 	})
 }
 
 func handlePost(w http.ResponseWriter, r *http.Request) {
-
 	err := r.ParseForm()
 	if err != nil {
 		log.WithError(err).Error("parsing form")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	for key, values := range r.PostForm { // range over map
 		for _, value := range values { // range over []string
 			log.Infof("Key: %v Value: %v", key, value)
 		}
 	}
-
 	subscriberEmail := r.PostForm["email"][0]
 	ctx := log.WithFields(
 		log.Fields{
 			"email": subscriberEmail,
 		})
-
 	sess := session.New()
 	creds := credentials.NewChainCredentials(
 		[]credentials.Provider{
@@ -84,28 +75,30 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 			&credentials.SharedCredentialsProvider{Filename: "", Profile: "mine"},
 			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(sess)},
 		})
-
 	cfg := &aws.Config{
 		Region:                        aws.String("ap-southeast-1"),
 		Credentials:                   creds,
 		CredentialsChainVerboseErrors: aws.Bool(true),
 	}
-
 	sess, err = session.NewSession(cfg)
-
+	if err != nil {
+		ctx.WithError(err).Error("unable to start session")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	svc := sns.New(sess)
-
 	_, err = svc.Subscribe(&sns.SubscribeInput{
 		Endpoint: aws.String(subscriberEmail),
 		Protocol: aws.String("email"),
 		TopicArn: aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
 	})
-
-	t := template.Must(template.New("").ParseGlob("templates/*.html"))
-	t.ExecuteTemplate(w, "thankyou.html", map[string]interface{}{
+	if err != nil {
+		ctx.WithError(err).Error("unable to subscribe")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	views.ExecuteTemplate(w, "thankyou.html", map[string]interface{}{
 		csrf.TemplateTag: csrf.TemplateField(r),
-		"Stage":          os.Getenv("UP_STAGE"),
-		"Year":           time.Now().Format("2006"),
 	})
 	ctx.Info("subscribed")
 }
