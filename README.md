@@ -1,4 +1,4 @@
-# AWS based announce mail list
+# AWS based announce mailing list
 
 	aws sns publish --subject "Managed services make it easy" --topic-arn $TOPIC --message file://announce-text.md
 
@@ -21,3 +21,8 @@ Admin page: https://ap-southeast-1.console.aws.amazon.com/sns/v3/home?region=ap-
 * Does not support HTML / Rich text
 * From address is <no-reply@sns.amazonaws.com>
 * No archives
+
+# Preventing abuse
+
+	$ curl -d "email=foo@example.com" -X POST https://subscribe.dabase.com/
+	Forbidden - CSRF token invalid
