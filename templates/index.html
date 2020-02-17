@@ -1,16 +1,7 @@
-<!DOCTYPE html>
-<html lang=en>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,minimum-scale=1">
-<meta name="description" content="Subscribe to dabase.com news"/>
-<title>Subscribe to dabase</title>
-</head>
-<body>
+{{template "header" .}}
 <form action="/subscribe" method="POST">
 <input required type=email name=email placeholder="email@example.com">
 {{ .csrfField }}
 <input type="submit" value="Subscribe by email">
 </form>
-</body>
-</html>
+{{template "footer"}}

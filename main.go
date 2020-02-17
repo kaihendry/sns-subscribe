@@ -47,6 +47,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	views.ExecuteTemplate(w, "index.html", map[string]interface{}{
 		csrf.TemplateTag: csrf.TemplateField(r),
+		"Title":          "Subscribe",
 	})
 }
 
@@ -56,11 +57,6 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		log.WithError(err).Error("parsing form")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	for key, values := range r.PostForm { // range over map
-		for _, value := range values { // range over []string
-			log.Infof("Key: %v Value: %v", key, value)
-		}
 	}
 
 	subscriberEmail := r.PostForm["email"][0]
@@ -88,13 +84,16 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	_, err = svc.Subscribe(&sns.SubscribeInput{
 		Endpoint: aws.String(subscriberEmail),
 		Protocol: aws.String("email"),
-		TopicArn: aws.String("arn:aws:sns:ap-southeast-1:407461997746:dabase"),
+		TopicArn: aws.String(os.Getenv("TOPIC")),
 	})
 	if err != nil {
 		ctx.WithError(err).Error("unable to subscribe")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	views.ExecuteTemplate(w, "thankyou.html", nil)
+	views.ExecuteTemplate(w, "thankyou.html", map[string]interface{}{
+		"Title": "Thank you",
+	})
+
 	ctx.Info("subscribed")
 }
