@@ -32,9 +32,8 @@ func main() {
 	app.HandleFunc("/", handleIndex).Methods("GET")
 	var options []csrf.Option
 	if os.Getenv("UP_STAGE") == "" {
-		// https://godoc.org/github.com/gorilla/csrf#Secure
 		log.Warn("CSRF insecure")
-		options = append(options, csrf.Secure(false))
+		options = append(options, csrf.Secure(false)) // https://godoc.org/github.com/gorilla/csrf#Secure
 	}
 	if err := http.ListenAndServe(addr,
 		csrf.Protect([]byte("dabase"), options...)(app)); err != nil {
@@ -63,11 +62,10 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 			log.Infof("Key: %v Value: %v", key, value)
 		}
 	}
+
 	subscriberEmail := r.PostForm["email"][0]
-	ctx := log.WithFields(
-		log.Fields{
-			"email": subscriberEmail,
-		})
+	ctx := log.WithField("email", subscriberEmail)
+
 	sess := session.New()
 	creds := credentials.NewChainCredentials(
 		[]credentials.Provider{
@@ -97,8 +95,6 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	views.ExecuteTemplate(w, "thankyou.html", map[string]interface{}{
-		csrf.TemplateTag: csrf.TemplateField(r),
-	})
+	views.ExecuteTemplate(w, "thankyou.html", nil)
 	ctx.Info("subscribed")
 }
