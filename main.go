@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"html/template"
 	"net/http"
 	"os"
@@ -19,13 +20,19 @@ import (
 )
 
 var views = template.Must(template.New("").ParseGlob("templates/*.html"))
+var topic *string
 
 func main() {
+
+	topic = flag.String("topic", os.Getenv("TOPIC"), "SNS topic to subscribe to")
+	flag.Parse()
+
 	if os.Getenv("UP_STAGE") == "" {
 		log.SetHandler(text.Default)
 	} else {
 		log.SetHandler(jsonhandler.Default)
 	}
+
 	addr := ":" + os.Getenv("PORT")
 	app := mux.NewRouter()
 	app.HandleFunc("/subscribe", handlePost).Methods("POST")
@@ -84,7 +91,7 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	_, err = svc.Subscribe(&sns.SubscribeInput{
 		Endpoint: aws.String(subscriberEmail),
 		Protocol: aws.String("email"),
-		TopicArn: aws.String(os.Getenv("TOPIC")),
+		TopicArn: topic,
 	})
 	if err != nil {
 		ctx.WithError(err).Error("unable to subscribe")
