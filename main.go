@@ -19,37 +19,42 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var views = template.Must(template.New("").ParseGlob("templates/*.html"))
-var topic *string
+var (
+	views   = template.Must(template.New("").ParseGlob("templates/*.html"))
+	topic   *string
+	upStage string
+	port    string
+)
 
 func main() {
 
 	topic = flag.String("topic", os.Getenv("TOPIC"), "SNS topic to subscribe to")
+	upStage = *flag.String("upstage", os.Getenv("UP_STAGE"), "Apex Up stage identifier")
+	port = *flag.String("port", os.Getenv("PORT"), "Port to listen to")
 	flag.Parse()
 
-	if os.Getenv("UP_STAGE") == "" {
+	if upStage == "" {
 		log.SetHandler(text.Default)
 	} else {
 		log.SetHandler(jsonhandler.Default)
 	}
 
-	addr := ":" + os.Getenv("PORT")
 	app := mux.NewRouter()
 	app.HandleFunc("/subscribe", handlePost).Methods("POST")
 	app.HandleFunc("/", handleIndex).Methods("GET")
 	var options []csrf.Option
-	if os.Getenv("UP_STAGE") == "" {
+	if upStage == "" {
 		log.Warn("CSRF insecure")
 		options = append(options, csrf.Secure(false)) // https://godoc.org/github.com/gorilla/csrf#Secure
 	}
-	if err := http.ListenAndServe(addr,
+	if err := http.ListenAndServe(":"+port,
 		csrf.Protect([]byte("dabase"), options...)(app)); err != nil {
 		log.WithError(err).Fatal("error listening")
 	}
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("UP_STAGE") != "production" {
+	if upStage != "production" {
 		w.Header().Set("X-Robots-Tag", "none")
 	}
 	views.ExecuteTemplate(w, "index.html", map[string]interface{}{
